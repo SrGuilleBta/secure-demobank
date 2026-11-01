@@ -107,6 +107,7 @@ docs/           Arquitectura, modelo de amenazas y pipeline DevSecOps
 
 | Documento | Contenido |
 |---|---|
+| [docs/guia-equipo.md](docs/guia-equipo.md) | **Empieza aquí si eres del equipo:** dónde estamos, cómo trabajamos y qué le toca a cada rol |
 | [docs/arquitectura.md](docs/arquitectura.md) | Componentes, límites de confianza, flujos de datos, activos, decisiones de diseño seguro y su verificación |
 | [docs/modelo-amenazas.md](docs/modelo-amenazas.md) | STRIDE por elemento, 24 amenazas con riesgo, mitigación, responsable y prueba; casos de abuso; riesgos aceptados |
 | [docs/devsecops.md](docs/devsecops.md) | Pipeline de CI, herramientas, manejo de falsos positivos y hallazgos del pipeline |
