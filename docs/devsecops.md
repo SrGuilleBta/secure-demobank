@@ -13,7 +13,6 @@ y **cada semana** aunque nadie toque el código (nuevas CVEs en dependencias ya 
 | **Semgrep** 1.180.0 | Patrones inseguros (SAST) en Python, Dockerfile, Compose y Nginx. Reglas: `p/python`, `p/owasp-top-ten`, `p/dockerfile`, `p/docker-compose`, `p/nginx` | CI, `dev.py scan` | T-05, T-06, T-10, T-14, T-21, T-22 |
 | **pip-audit** 2.10.1 | Dependencias de Python con vulnerabilidades conocidas (base de datos de PyPI/OSV) | CI (push, PR y semanal), `dev.py scan` | T-22 |
 | **Dependency Review** | Dependencias vulnerables (severidad moderada o mayor) que un PR intenta agregar | CI, solo en PRs | T-22 |
-| **Dependabot** | Abre PRs con versiones nuevas (con 14 días de antigüedad mínima) y parches de seguridad | GitHub, semanal | T-22 |
 | **pytest** | Pruebas del backend, incluidas las de seguridad | CI | Varias |
 | **OWASP ZAP** | Escaneo dinámico (DAST) del sistema en ejecución | Local, semanas 4 y 5 (Frontend y pruebas) | T-02, T-09, T-10, T-14 |
 
@@ -73,8 +72,7 @@ Hallazgos encontrados por las herramientas automáticas. Se trasladan al registr
 
 | ID | Fecha | Herramienta | Hallazgo | Severidad | Amenaza | Corrección | Re-prueba |
 |---|---|---|---|---|---|---|---|
-| SAST-001 | 2026-10-31 | Semgrep `dependabot-missing-cooldown` | `.github/dependabot.yml` no definía un *cooldown*: Dependabot podía proponer versiones recién publicadas, posiblemente maliciosas | Media | T-22 | `cooldown: default-days: 14` en los cuatro ecosistemas | Semgrep: 0 hallazgos |
-| SAST-002 | 2026-10-31 | Semgrep `request-host-used` | `proxy/default.conf` y `proxy/snippets/proxy-backend.conf` usaban el Host enviado por el cliente en una redirección y hacia la API (Host header injection) | Media | T-05 | Servidor por defecto que responde `421`; Host fijo hacia la API | Semgrep: 0 hallazgos; `curl -H "Host: evil.example"` → `421` |
+| SAST-001 | 2026-10-31 | Semgrep `request-host-used` | `proxy/default.conf` y `proxy/snippets/proxy-backend.conf` usaban el Host enviado por el cliente en una redirección y hacia la API (Host header injection) | Media | T-05 | Servidor por defecto que responde `421`; Host fijo hacia la API | Semgrep: 0 hallazgos; `curl -H "Host: evil.example"` → `421` |
 | — | 2026-10-31 | Semgrep `request-host-used` | Falso positivo: la regla coincidía con el texto de un comentario que mencionaba la variable | — | — | Se reescribió el comentario (no se usó `nosemgrep`) | Semgrep: 0 hallazgos |
 
 Resultado del último escaneo completo (2026-10-31): Gitleaks sin fugas, Semgrep con 0 hallazgos en 208 reglas sobre

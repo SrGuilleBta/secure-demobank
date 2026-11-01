@@ -100,7 +100,7 @@ proxy/          Configuración de Nginx: cabeceras de seguridad, rate limiting
 db/init/        Creación de roles de PostgreSQL con mínimo privilegio
 scripts/dev.py  Arranque, reinicio y escaneos locales
 docs/           Arquitectura, modelo de amenazas y pipeline DevSecOps
-.github/        Workflow de seguridad y Dependabot
+.github/        Workflow de seguridad
 ```
 
 ## Documentación de seguridad

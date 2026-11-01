@@ -96,7 +96,7 @@ ni crear roles. Las tablas *append-only* (bitácora de auditoría) deben además
 | **TB-2** | Proxy ↔ API | Peticiones ya filtradas (F3) | El proxy filtra *forma*, no *intención*: la API sigue tratando el contenido como no confiable | Red interna `edge`; Host fijo; `X-Forwarded-For` sobrescrito por el proxy; Uvicorn solo acepta cabeceras de proxy desde la subred `edge` |
 | **TB-3** | API ↔ Base de datos | Consultas SQL (F4) | La BD guarda los activos más valiosos; una API comprometida no debe poder hacer cualquier cosa | Red interna `data`; usuario sin DDL; consultas parametrizadas (ORM); autenticación SCRAM-SHA-256 |
 | **TB-4** | Host ↔ Contenedores | Secretos (F6), kernel compartido | Un contenedor comprometido no debe escalar al host ni leer secretos de otros servicios | Cada servicio monta solo sus secretos; sin root; `cap_drop: ALL`; `no-new-privileges`; FS solo lectura; límites de memoria y procesos |
-| **TB-5** | Desarrollo ↔ Repositorio/CI | Código, dependencias, actions (F7) | El código y sus dependencias pueden introducir vulnerabilidades o secretos | Gitleaks (pre-commit y CI), Semgrep, pip-audit, revisión de dependencias en PRs, actions fijadas por SHA, Dependabot con cooldown |
+| **TB-5** | Desarrollo ↔ Repositorio/CI | Código, dependencias, actions (F7) | El código y sus dependencias pueden introducir vulnerabilidades o secretos | Gitleaks (pre-commit y CI), Semgrep, pip-audit, revisión de dependencias en PRs, actions fijadas por SHA |
 
 ## 5. Flujos de datos
 
@@ -124,7 +124,7 @@ ni crear roles. Las tablas *append-only* (bitácora de auditoría) deben además
 | `http://localhost:8080/api/auth/*` | Navegador | Login y registro; 10 req/min por IP (ráfaga de 5) |
 | `http://localhost:8080/api/docs` y `/api/openapi.json` | Navegador | **Solo con `APP_ENV=development`**; ZAP los usa para escanear la API |
 | Puerto 5432 de la BD | **Nadie fuera de la red `data`** | No se publica en el host |
-| Repositorio y PRs | Integrantes del equipo y Dependabot | Protegidos por el pipeline de CI |
+| Repositorio y PRs | Integrantes del equipo | Protegidos por el pipeline de CI |
 
 ## 7. Activos que requieren protección
 
@@ -157,7 +157,7 @@ C = confidencialidad, I = integridad, D = disponibilidad.
 | D-10 | Rate limiting en el borde, más estricto en `/api/auth/` | Disponibilidad y anti-automatización | Frena fuerza bruta y abuso antes de consumir recursos de la API | T-03, T-18 |
 | D-11 | El proxy fija `Host` y sobrescribe `X-Forwarded-For`; Uvicorn solo confía en la subred del proxy | No confiar en la entrada del cliente | Evita Host header injection, DNS rebinding y falsificar la IP registrada en auditoría | T-05, T-12 |
 | D-12 | Frontend y API en el mismo origen | Simplicidad | Sin CORS que configurar mal; permite cookies `SameSite=Strict` | T-09 |
-| D-13 | Dependencias, imágenes y actions fijadas por versión o SHA; escaneo continuo; cooldown de 14 días | Seguridad de la cadena de suministro | Builds reproducibles; ningún cambio de versión entra sin pasar por CI | T-22 |
+| D-13 | Dependencias, imágenes y actions fijadas por versión o SHA; escaneo continuo | Seguridad de la cadena de suministro | Builds reproducibles; ningún cambio de versión entra sin pasar por CI | T-22 |
 | D-14 | Errores genéricos al cliente y detalle solo en logs del servidor | Fallar de forma segura | El cliente nunca ve trazas, consultas ni rutas internas | T-14 |
 | D-15 | FastAPI + PostgreSQL | Usar controles maduros | Pydantic valida tipos y rangos por defecto; PostgreSQL ofrece transacciones ACID, `CHECK`, bloqueos de fila y roles | T-06, T-07, T-08 |
 

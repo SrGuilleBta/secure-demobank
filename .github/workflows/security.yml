@@ -1,6 +1,5 @@
 # Pipeline de seguridad (DevSecOps). Descripción y cómo leer los resultados: docs/devsecops.md
-# Las actions están fijadas por SHA de commit (no por tag) para evitar ataques a la cadena de suministro;
-# Dependabot las mantiene actualizadas.
+# Las actions están fijadas por SHA de commit (no por tag) para evitar ataques a la cadena de suministro.
 
 name: security
 

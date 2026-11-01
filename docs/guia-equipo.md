@@ -227,5 +227,5 @@ proxy/              Nginx: cabeceras, CSP, rate limiting, límites
 db/init/            Roles de PostgreSQL
 scripts/dev.py      Arranque, reinicio y escaneos
 docs/               arquitectura.md, modelo-amenazas.md, devsecops.md y esta guía
-.github/            CI de seguridad y Dependabot
+.github/            CI de seguridad
 ```
