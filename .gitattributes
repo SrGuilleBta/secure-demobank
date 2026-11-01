@@ -1,0 +1,6 @@
+# Los scripts y configs que se montan en contenedores Linux deben conservar LF aunque se clonen en Windows.
+* text=auto
+*.sh text eol=lf
+*.conf text eol=lf
+*.yml text eol=lf
+*.py text eol=lf

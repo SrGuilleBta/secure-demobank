@@ -1,0 +1,6 @@
+# Versiones fijadas: cualquier cambio pasa por revisión y por pip-audit en CI.
+fastapi==0.143.3
+uvicorn[standard]==0.54.0
+pydantic-settings==2.16.0
+SQLAlchemy==2.1.5
+psycopg[binary]==3.3.6

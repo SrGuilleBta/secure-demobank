@@ -1,0 +1,7 @@
+# Bloquea secretos ANTES de que lleguen a un commit (el CI los detecta después; esto los evita).
+# Instalación (una vez por clon): pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

@@ -1,0 +1,26 @@
+# Secretos generados localmente por scripts/dev.py (NUNCA se versionan)
+secrets/
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend (cuando se elija el stack)
+node_modules/
+frontend/dist/
+
+# Reportes de escaneos locales
+reports/
+*.sarif
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
