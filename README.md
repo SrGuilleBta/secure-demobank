@@ -15,6 +15,7 @@ Solo el proxy publica puertos, y solo en `127.0.0.1`. Detalles en [docs/arquitec
 - **Docker Desktop** instalado y **abierto** (el ícono de la ballena debe indicar que está corriendo)
 - **Python 3.12** o superior
 - **Git**
+- **Node 24** (solo si vas a trabajar en el frontend con `npm run dev`; para levantar el stack no hace falta)
 
 > **Clona el repo en un disco interno (NTFS, ext4, APFS), no en una USB.** Docker Desktop no comparte unidades
 > removibles con su máquina virtual, y FAT32 no guarda dueños de archivos (git responde con "dubious ownership").
@@ -61,7 +62,7 @@ La primera vez tarda unos minutos porque descarga las imágenes de Docker. Qué 
 | `python scripts/dev.py reset` | Detiene el stack y **borra la base de datos** (pide confirmación) |
 | `python scripts/dev.py logs` | Sigue los logs de todos los servicios (Ctrl+C para salir) |
 | `python scripts/dev.py setup` | Solo genera secretos y `.env`, sin levantar nada (nunca sobrescribe) |
-| `python scripts/dev.py scan` | Gitleaks, Semgrep y pip-audit, igual que en el CI |
+| `python scripts/dev.py scan` | Gitleaks, Semgrep, pip-audit y npm audit, igual que en el CI |
 
 ### Después de cambiar código
 
@@ -69,7 +70,7 @@ La primera vez tarda unos minutos porque descarga las imágenes de Docker. Qué 
 |---|---|
 | Código del backend (`backend/`) | `python scripts/dev.py up` (reconstruye la imagen) |
 | Configuración del proxy (`proxy/`) | `docker compose restart proxy` |
-| Archivos del frontend (`frontend/public/`) | Nada: solo recarga la página |
+| Código del frontend (`frontend/`) | `python scripts/dev.py up` (reconstruye la imagen del proxy), o `npm run dev` en `frontend/` para verlo al instante en <http://localhost:5173> |
 | Contraseñas (`secrets/`) o scripts de `db/init/` | `python scripts/dev.py reset` y luego `up` (la base de datos solo lee esos datos al crearse) |
 
 ### Pruebas del backend
@@ -95,8 +96,8 @@ cd backend && python -m venv .venv && .venv/Scripts/pip install -r requirements-
 
 ```
 backend/        API FastAPI (app/, tests/, Dockerfile)
-frontend/       Frontend (libre elección, preferentemente React; por ahora un marcador estático en public/)
-proxy/          Configuración de Nginx: cabeceras de seguridad, rate limiting
+frontend/       Frontend React + Vite (se compila dentro de la imagen del proxy)
+proxy/          Nginx: cabeceras de seguridad, rate limiting, y Dockerfile que compila y sirve el frontend
 db/init/        Creación de roles de PostgreSQL con mínimo privilegio
 scripts/dev.py  Arranque, reinicio y escaneos locales
 docs/           Arquitectura, modelo de amenazas y pipeline DevSecOps

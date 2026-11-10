@@ -8,7 +8,7 @@ tuya (sección 4).
 **Secure DemoBank** es una billetera digital simulada: los usuarios se registran, ven su saldo, transfieren dinero
 ficticio a otros usuarios y revisan su historial. Un administrador gestiona usuarios y consulta la bitácora.
 
-**Stack:** FastAPI (Python) + PostgreSQL + Nginx como proxy. El frontend es de libre elección, preferentemente React.
+**Stack:** FastAPI (Python) + PostgreSQL + Nginx como proxy. El frontend es React (Vite).
 
 ### Ya está hecho
 
@@ -18,7 +18,7 @@ ficticio a otros usuarios y revisan su historial. Un administrador gestiona usua
 | Redes internas, contenedores sin root, secretos generados, roles de BD con mínimo privilegio | [arquitectura.md](arquitectura.md) |
 | Proxy con cabeceras de seguridad, CSP estricta, rate limiting y límites de tamaño | `proxy/` |
 | Modelo de amenazas STRIDE con 24 amenazas, casos de abuso y riesgos aceptados | [modelo-amenazas.md](modelo-amenazas.md) |
-| CI de seguridad (Gitleaks, Semgrep, pip-audit, pruebas) | [devsecops.md](devsecops.md) |
+| CI de seguridad (Gitleaks, Semgrep, pip-audit, npm audit, pruebas) | [devsecops.md](devsecops.md) |
 | API mínima: solo `/api/health`, configuración y una prueba | `backend/` |
 
 ### Falta por construir
@@ -36,7 +36,7 @@ porque dependen de esa lógica**: son las que se implementan en la semana 3.
    interno, no en una USB.
 2. **Una rama por tarea**, con el nombre que quieras, y **un pull request** para juntarla con `main`. Esta es una
    propuesta; si el equipo prefiere otro flujo, se ajusta.
-3. **El CI debe quedar en verde** antes de juntar un PR. Corre Gitleaks, Semgrep, pip-audit y las pruebas. Puedes
+3. **El CI debe quedar en verde** antes de juntar un PR. Corre Gitleaks, Semgrep, pip-audit, npm audit y las pruebas. Puedes
    correr los escaneos antes de subir: `python scripts/dev.py scan`.
 4. **Nunca subas secretos.** Las contraseñas viven en `secrets/` y `.env`, que están en `.gitignore`. Cada quien
    genera los suyos al arrancar.
@@ -141,17 +141,16 @@ secretos) y `db.py` (conexión a la base de datos). Las pruebas están en `backe
 
 ### 4.3 Frontend y pruebas de seguridad
 
-**Frontend:** libre elección, preferentemente React. Detalles técnicos en [frontend/README.md](../frontend/README.md).
-Lo esencial:
+**Frontend:** React + Vite, ya configurado en `frontend/`. Cómo correrlo y trabajar en él:
+[frontend/README.md](../frontend/README.md). Lo esencial:
 
 - El navegador solo habla con el proxy (`http://localhost:8080`). **Frontend y API comparten origen**: no hace falta
   CORS.
-- La API vive bajo `/api/`. Todo lo demás lo sirve el proxy desde `frontend/public/`.
+- La API vive bajo `/api/`. Todo lo demás lo sirve el proxy con el build de React (se compila dentro de su imagen).
 - **La CSP no permite JavaScript ni CSS escritos dentro del HTML.** Todo debe ir en archivos propios. Si una
   librería lo necesita, se documenta y se ajusta la política en `proxy/default.conf`.
-- Si usas un servidor de desarrollo con otro puerto, configúralo para que mande `/api` a `http://localhost:8080`.
-- Para producir el build, el proxy tiene que montar `dist/` en lugar de `public/` (cambio en `docker-compose.yml`;
-  avisa a Arquitectura).
+- Para desarrollar con recarga instantánea: `npm run dev` en `frontend/` (puerto 5173). Ya manda `/api` al proxy.
+- Para ver el build final dentro del stack: `python scripts/dev.py up` (reconstruye la imagen del proxy).
 
 **Tareas de interfaz**
 
@@ -214,7 +213,6 @@ finales y conclusiones.
 | ¿Roles `cliente` y `administrador`, y qué puede hacer cada uno? | Docs, con Backend | Empezar con esos dos |
 | ¿Quién implementa el hash Argon2id? | Arquitectura y Backend | Arquitectura escribe la función, Backend la usa |
 | ¿Herramienta de migraciones? | Arquitectura y Backend | Alembic |
-| ¿Framework del frontend? | Frontend | React |
 | ¿Está aprobado el proyecto por el docente? | Docs | Confirmarlo cuanto antes |
 
 ## 6. Dónde está cada cosa

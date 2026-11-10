@@ -6,7 +6,7 @@
     python scripts/dev.py down    Detiene el stack (conserva los datos)
     python scripts/dev.py reset   Detiene el stack y BORRA la base de datos (pide confirmación)
     python scripts/dev.py logs    Sigue los logs de todos los servicios
-    python scripts/dev.py scan    Escaneos locales: Gitleaks, Semgrep y pip-audit (los mismos que corre el CI)
+    python scripts/dev.py scan    Escaneos locales: Gitleaks, Semgrep, pip-audit y npm audit (los mismos que corre el CI)
 
 Solo usa la biblioteca estándar de Python; requiere Docker.
 """
@@ -30,8 +30,11 @@ REPORTS_DIR = ROOT / "reports"
 GITLEAKS_IMAGE = "zricethezav/gitleaks:v8.30.1"
 SEMGREP_IMAGE = "semgrep/semgrep:1.180.0"
 PYTHON_IMAGE = "python:3.12-slim-trixie"
+NODE_IMAGE = "node:24-alpine"
 PIP_AUDIT_VERSION = "2.10.1"
-SEMGREP_CONFIGS = ["p/python", "p/owasp-top-ten", "p/dockerfile", "p/docker-compose", "p/nginx"]
+SEMGREP_CONFIGS = [
+    "p/python", "p/javascript", "p/react", "p/owasp-top-ten", "p/dockerfile", "p/docker-compose", "p/nginx",
+]
 
 PASSWORD_SECRETS = ["db_admin_password", "db_migrator_password", "db_app_password"]
 KEY_SECRETS = ["app_secret_key"]
@@ -143,6 +146,12 @@ def cmd_scan(_args: argparse.Namespace) -> None:
         "&& pip-audit --strict -r /app/requirements.txt",
     ], check=False):
         failures.append("pip-audit")
+
+    if run([
+        "docker", "run", "--rm", "-v", f"{ROOT / 'frontend'}:/app:ro", "-w", "/app", "-e", "HOME=/tmp",
+        NODE_IMAGE, "npm", "audit", "--audit-level=moderate",
+    ], check=False):
+        failures.append("npm-audit")
 
     print("\nReportes SARIF en reports/")
     if failures:

@@ -1,0 +1,11 @@
+# Contexto de build del proxy (raíz del repo). Nada de esto debe entrar a la imagen ni al builder.
+.git
+.env
+secrets
+reports
+docs
+backend
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__

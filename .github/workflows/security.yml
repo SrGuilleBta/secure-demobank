@@ -53,12 +53,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Semgrep (Python, OWASP Top 10, Dockerfile, Compose, Nginx)
+      - name: Semgrep (Python, JavaScript, React, OWASP Top 10, Dockerfile, Compose, Nginx)
         run: |
           docker run --rm -v "$PWD:/src" -w /src --user "$(id -u):$(id -g)" -e HOME=/tmp \
             semgrep/semgrep:1.180.0 semgrep scan --metrics=off --error \
             --config p/python --config p/owasp-top-ten --config p/dockerfile \
-            --config p/docker-compose --config p/nginx \
+            --config p/docker-compose --config p/nginx --config p/javascript --config p/react \
             --sarif-output=semgrep.sarif
       - name: Publicar hallazgos en Security > Code scanning
         if: always() && hashFiles('semgrep.sarif') != ''
@@ -93,6 +93,26 @@ jobs:
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: moderate
+
+  frontend:
+    name: Frontend (npm audit y build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: npm audit contra la base de vulnerabilidades de npm
+        run: npm audit --audit-level=moderate
+      - run: npm run build
 
   pruebas:
     name: Pruebas del backend

@@ -20,7 +20,7 @@ Este documento describe **cómo está construido el sistema y por qué**, desde 
 | Operaciones de dinero: consultar saldo, transferir, historial | Integridad transaccional en PostgreSQL (T-07, T-08) |
 | Frontend y API se sirven desde el **mismo origen** | Sin CORS; cookies `SameSite=Strict` (T-09) |
 | Entorno: local con Docker; sin despliegue público | Solo accesible desde la propia máquina (`127.0.0.1`) |
-| Stack: FastAPI + PostgreSQL; frontend de libre elección (preferentemente React) | La arquitectura no depende de la opción de frontend |
+| Stack: FastAPI + PostgreSQL + React (Vite) | El frontend se compila en la imagen del proxy y se sirve como archivos estáticos |
 
 ## 2. Vista general
 
@@ -72,9 +72,9 @@ la sección 5 y analizado con STRIDE en el modelo de amenazas.
 | **Proxy** | `nginxinc/nginx-unprivileged:1.30-alpine` | Rechazar Host desconocidos; cabeceras de seguridad y CSP; rate limiting; límites de tamaño y tiempo; servir el frontend estático | No toma decisiones de autenticación ni autorización |
 | **API** | FastAPI sobre Uvicorn, Python 3.12 | Autenticación, autorización por rol y por recurso, validación de entradas, reglas de negocio de dinero, manejo de errores, bitácora de auditoría | No confía en nada del cliente, aunque llegue por el proxy |
 | **Base de datos** | PostgreSQL 17 | Persistencia; integridad (transacciones, `CHECK`, llaves foráneas); mínimo privilegio por rol | No es alcanzable desde fuera de la red `data` |
-| **Frontend** | Libre elección (preferentemente React) | Interfaz; no guardar secretos en el navegador; respetar la CSP (sin código inline) | No contiene lógica de autorización (solo la refleja) |
+| **Frontend** | React 19 + Vite (build dentro de `proxy/Dockerfile`) | Interfaz; no guardar secretos en el navegador; respetar la CSP (sin código inline) | No contiene lógica de autorización (solo la refleja) |
 | **Secretos** | Archivos en `secrets/`, montados como Docker secrets | Contraseñas de BD y llave de firma de la app | Nunca se versionan ni viajan como variables de entorno |
-| **CI** | GitHub Actions | Gitleaks, Semgrep, pip-audit, revisión de dependencias, pruebas | Ver [devsecops.md](devsecops.md) |
+| **CI** | GitHub Actions | Gitleaks, Semgrep, pip-audit, npm audit, revisión de dependencias, pruebas | Ver [devsecops.md](devsecops.md) |
 
 ### Roles de base de datos
 

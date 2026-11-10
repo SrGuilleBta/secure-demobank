@@ -10,8 +10,9 @@ y **cada semana** aunque nadie toque el código (nuevas CVEs en dependencias ya 
 | Herramienta | Qué detecta | Dónde corre | Amenazas |
 |---|---|---|---|
 | **Gitleaks** 8.30.1 | Contraseñas, llaves y tokens en el código **y en todo el historial** de git | pre-commit, CI, `dev.py scan` | T-15 |
-| **Semgrep** 1.180.0 | Patrones inseguros (SAST) en Python, Dockerfile, Compose y Nginx. Reglas: `p/python`, `p/owasp-top-ten`, `p/dockerfile`, `p/docker-compose`, `p/nginx` | CI, `dev.py scan` | T-05, T-06, T-10, T-14, T-21, T-22 |
+| **Semgrep** 1.180.0 | Patrones inseguros (SAST) en Python, JavaScript/React, Dockerfile, Compose y Nginx. Reglas: `p/python`, `p/javascript`, `p/react`, `p/owasp-top-ten`, `p/dockerfile`, `p/docker-compose`, `p/nginx` | CI, `dev.py scan` | T-05, T-06, T-10, T-14, T-21, T-22 |
 | **pip-audit** 2.10.1 | Dependencias de Python con vulnerabilidades conocidas (base de datos de PyPI/OSV) | CI (push, PR y semanal), `dev.py scan` | T-22 |
+| **npm audit** | Dependencias del frontend (npm) con vulnerabilidades conocidas; falla desde severidad moderada | CI (push, PR y semanal), `dev.py scan` | T-22 |
 | **Dependency Review** | Dependencias vulnerables (severidad moderada o mayor) que un PR intenta agregar | CI, solo en PRs | T-22 |
 | **pytest** | Pruebas del backend, incluidas las de seguridad | CI | Varias |
 | **OWASP ZAP** | Escaneo dinámico (DAST) del sistema en ejecución | Local, semanas 4 y 5 (Frontend y pruebas) | T-02, T-09, T-10, T-14 |
@@ -26,6 +27,7 @@ PR, manualmente (*workflow_dispatch*) y los lunes a las 06:00 UTC.
 | Secretos (Gitleaks) | Encuentra al menos un secreto en el historial |
 | SAST (Semgrep) | Encuentra al menos un hallazgo bloqueante |
 | Dependencias (pip-audit) | Alguna dependencia de `backend/requirements.txt` tiene una vulnerabilidad conocida |
+| Frontend (npm audit y build) | Una dependencia de `frontend/package-lock.json` tiene una vulnerabilidad moderada o peor, o el build falla |
 | Revisión de dependencias del PR | El PR agrega una dependencia con vulnerabilidad moderada o mayor |
 | Pruebas del backend | Falla alguna prueba |
 
@@ -45,7 +47,7 @@ repositorio, donde quedan como evidencia con su historial (abierto, corregido, d
 python scripts/dev.py scan
 ```
 
-Corre Gitleaks, Semgrep y pip-audit en contenedores (solo requiere Docker) y deja los reportes SARIF en `reports/`.
+Corre Gitleaks, Semgrep, pip-audit y npm audit en contenedores (solo requiere Docker) y deja los reportes SARIF en `reports/`.
 
 Para bloquear secretos antes de que lleguen a un commit (una vez por clon):
 
