@@ -19,16 +19,14 @@ ficticio a otros usuarios y revisan su historial. Un administrador gestiona usua
 | Proxy con cabeceras de seguridad, CSP estricta, rate limiting y límites de tamaño | `proxy/` |
 | Modelo de amenazas STRIDE con 24 amenazas, casos de abuso y riesgos aceptados | [modelo-amenazas.md](modelo-amenazas.md) |
 | CI de seguridad (Gitleaks, Semgrep, pip-audit, npm audit, pruebas) | [devsecops.md](devsecops.md) |
-| API mínima: solo `/api/health`, configuración y una prueba | `backend/` |
+| API completa: registro, login, sesiones, cuenta, transferencias, panel de administrador y bitácora (63 pruebas) | `backend/` |
+| Frontend React (Vite) compilado dentro de la imagen del proxy, con pantalla inicial | `frontend/` |
 
 ### Falta por construir
 
-- Toda la lógica del banco: registro, login, cuentas, transferencias, historial, panel de administrador.
-- El frontend.
-- Las pruebas de seguridad (ZAP y casos de prueba), el registro de vulnerabilidades y la presentación final.
-
-La mayor parte de las amenazas del modelo (T-01, T-02, T-07, T-08, T-09, T-11, T-13, T-17, T-20) están **pendientes
-porque dependen de esa lógica**: son las que se implementan en la semana 3.
+- Las pantallas del frontend (registro, login, saldo, transferencias, historial y administrador).
+- Las pruebas dinámicas con ZAP, el registro de vulnerabilidades y la presentación final.
+- Decisión ya tomada: las sesiones van en cookie con token CSRF (D-16) y las tablas se crean con un script SQL (D-17).
 
 ## 2. Cómo trabajamos
 
@@ -83,11 +81,8 @@ El PDF del PIA organiza el trabajo en cinco semanas, con dos entregables:
 
 **Pendiente**
 
-- [ ] **Servicio de migraciones.** Un servicio de un solo uso en `docker-compose.yml` que corra las migraciones con
-      el rol `demobank_migrator`, y del que dependa `backend`. El backend ya no podrá crear tablas con su propio
-      usuario; esto es intencional (D-07). Coordinar con Backend la herramienta (Alembic es la opción natural).
-- [ ] **Hash de contraseñas con Argon2id** (el extra de criptografía): una función de hash y verificación que use
-      Backend, con parámetros documentados y una prueba (T-01). Si prefieres que Backend lo haga, acordarlo.
+- [x] **Esquema de la base de datos** (`db/schema.sql`, cargado por el rol `demobank_migrator`) y **hash Argon2id**
+      (`backend/app/security.py`). Hechos.
 - [ ] **Escaneo de imágenes** con Trivy en el CI (T-22).
 - [ ] **Protección de la rama `main`**: exigir CI en verde y una revisión antes de juntar un PR.
 - [ ] **Revisar los PRs del equipo** con ojos de seguridad, y mantener al día el modelo de amenazas.
@@ -97,47 +92,60 @@ El PDF del PIA organiza el trabajo en cinco semanas, con dos entregables:
 
 ### 4.2 Backend y seguridad de acceso
 
-**Punto de partida:** `backend/app/` ya tiene `main.py` (la app y `/api/health`), `config.py` (configuración y
-secretos) y `db.py` (conexión a la base de datos). Las pruebas están en `backend/tests/`.
+**Estado:** la API ya está construida y probada (63 pruebas, 57 de ellas contra un PostgreSQL real). Esta sección
+explica cómo está armada y cómo seguir extendiéndola.
 
-**Lo que tienes que saber de la infraestructura**
+**Cómo está armada** (`backend/app/`)
 
-- La API se conecta como `demobank_app`: **solo puede leer y escribir datos**, no crear ni borrar tablas. Las tablas
-  las crea el rol `demobank_migrator` (esquema `app`) y la API recibe permisos automáticamente.
-- Los secretos se leen con `get_settings()` (`backend/app/config.py`) y son `SecretStr`. La llave para firmar
-  sesiones o tokens ya existe: `settings.app_secret_key`. Para agregar un secreto nuevo hay que tocar
-  `PASSWORD_SECRETS`/`KEY_SECRETS` en `scripts/dev.py`, `secrets:` en `docker-compose.yml` y `Settings`.
-- Todo llega por el proxy bajo `/api/`. Tu API ve la IP real del cliente (el proxy sobrescribe `X-Forwarded-For`).
-- Para agregar una librería: fija su versión en `backend/requirements.txt`. El CI corre `pip-audit` sobre ese archivo
-  y falla si hay vulnerabilidades conocidas.
+| Archivo | Qué hace |
+|---|---|
+| `main.py` | Crea la app, registra los routers y los manejadores de errores (500 genérico; 422 sin devolver lo enviado) |
+| `routers/auth.py` | Registro, login (con bloqueo de cuenta) y logout |
+| `routers/accounts.py` | `/api/me` y `/api/account` |
+| `routers/transfers.py` | Crear, listar y consultar transferencias |
+| `routers/admin.py` | Usuarios y bitácora, solo para administradores |
+| `deps.py` | Quién es el usuario de la sesión, exigir token CSRF y exigir rol administrador |
+| `security.py` | Argon2id, generación y hash de tokens |
+| `schemas.py` | Validación estricta de entradas y forma de las respuestas |
+| `audit.py` | Escritura en la bitácora |
+| `config.py`, `db.py` | Configuración, secretos y conexión |
 
-**Tareas** (en el orden sugerido)
+**Endpoints** (todos bajo `/api`; el frontend los usa sin CORS, por el mismo origen)
 
-- [ ] **Modelo de datos y migraciones:** usuarios, cuentas, transferencias y bitácora. Dinero en **centavos
-      (enteros)**, nunca `float`; `CHECK (saldo >= 0)` en la tabla.
-- [ ] **Registro y login (T-01, T-17):** contraseñas con Argon2id, política de contraseñas, mensajes genéricos y
-      tiempo de respuesta constante aunque el usuario no exista.
-- [ ] **Sesiones (T-02):** decisión pendiente, **sesión en cookie `HttpOnly; SameSite=Strict` con token anti-CSRF**
-      (recomendada, más difícil de robar con XSS) o JWT. Documentar la decisión como un `D-xx` nuevo en
-      [arquitectura.md](arquitectura.md). Expiración, cierre de sesión que invalida en el servidor.
-- [ ] **Autorización (T-20, T-13):** denegar por defecto; el rol sale del servidor, nunca del cuerpo de la petición;
-      **cada consulta filtra por el dueño autenticado**, no solo por ID; responder `404` y no `403` para recursos
-      ajenos.
-- [ ] **Validación (T-07):** esquemas Pydantic con `extra="forbid"` y rangos (`gt=0`, monto máximo). La cuenta de
-      origen de una transferencia **sale de la sesión**, nunca del cuerpo.
-- [ ] **Transferencias (T-08):** una sola transacción con `SELECT ... FOR UPDATE` sobre ambas cuentas, en orden
-      fijo para evitar bloqueos mutuos, y llave de idempotencia contra reenvíos.
-- [ ] **Bitácora de auditoría (T-11):** login correcto y fallido, transferencias y cambios de rol, con usuario,
-      acción, recurso, IP y fecha del servidor. Tabla *append-only*: en su migración, `REVOKE UPDATE, DELETE` a
-      `demobank_app`.
-- [ ] **Bloqueo por cuenta (T-03):** bloqueo temporal tras N intentos fallidos (el proxy ya limita por IP).
-- [ ] **Errores y logs (T-14, T-24):** manejador global que responda genérico y deje el detalle en el log; nunca
-      registrar contraseñas, tokens ni datos completos.
-- [ ] **Paginación (T-19):** tamaño de página máximo.
-- [ ] **Una prueba por caso de abuso** que te toque (CA-01, CA-02, CA-03, CA-05, CA-07 en
-      [modelo-amenazas.md](modelo-amenazas.md)).
+| Método y ruta | Quién | Qué hace |
+|---|---|---|
+| `POST /auth/register` | Cualquiera | Crea una cuenta de cliente con saldo inicial de 100.000 centavos |
+| `POST /auth/login` | Cualquiera | Devuelve `username`, `role` y `csrf_token`, y pone la cookie de sesión |
+| `POST /auth/logout` | Con sesión + CSRF | Cierra la sesión en el servidor |
+| `GET /me`, `GET /account` | Con sesión | Datos del usuario y saldo |
+| `POST /transfers` | Con sesión + CSRF | Transfiere: `to_username`, `amount_cents` (entero), `concept`, `idempotency_key` (UUID) |
+| `GET /transfers?page=&page_size=` | Con sesión | Historial propio, máximo 50 por página |
+| `GET /transfers/{id}` | Con sesión | Una transferencia propia; si es ajena, `404` |
+| `GET /admin/users`, `GET /admin/audit` | Administrador | Usuarios y bitácora |
 
-**Correr las pruebas:** ver el [README](../README.md#pruebas-del-backend).
+**Reglas para el frontend.** Guardar el `csrf_token` que devuelve el login (en memoria, no en `localStorage`) y enviarlo
+en la cabecera `X-CSRF-Token` en cada `POST`. La cookie de sesión la maneja el navegador. Cada transferencia nueva lleva
+una `idempotency_key` nueva (`crypto.randomUUID()`); si se reintenta la misma petición, se reutiliza la misma.
+
+**Cómo extenderla**
+
+- **Un endpoint nuevo:** agrégalo en un router, valida la entrada con un esquema de `schemas.py` (siempre `extra="forbid"`),
+  usa `Depends(get_current_user)` o `Depends(require_csrf)` si cambia datos, filtra por el dueño autenticado y registra
+  en la bitácora si es un evento de seguridad.
+- **Consultas SQL:** siempre con parámetros (`:nombre`), nunca armando texto. Si una consulta necesita unir tablas,
+  créale una vista en `db/schema.sql` (como `transfer_details`) y consúltala con texto fijo.
+- **Cambiar las tablas:** edita `db/schema.sql` y corre `python scripts/dev.py reset` y luego `up`.
+- **Un administrador:** regístralo desde la aplicación y luego `python scripts/dev.py admin <usuario>`.
+- **Una librería:** fija su versión en `backend/requirements.txt` (el CI corre `pip-audit`).
+- **Un secreto nuevo:** `PASSWORD_SECRETS`/`KEY_SECRETS` en `scripts/dev.py`, `secrets:` en `docker-compose.yml` y `Settings`.
+
+**Correr las pruebas:** `python scripts/dev.py test` (levanta una base de datos desechable, corre pytest y la borra).
+Sin Docker, `pytest` corre solo las pruebas que no necesitan base de datos y salta el resto.
+
+**Pendiente (opcional)**
+
+- [ ] `statement_timeout` en la conexión a la base de datos (T-19).
+- [ ] Lista de contraseñas comunes y MFA (T-01): fuera del alcance acordado; documentado en el modelo de amenazas.
 
 ### 4.3 Frontend y pruebas de seguridad
 
@@ -209,16 +217,13 @@ finales y conclusiones.
 
 | Decisión | Quién | Mi recomendación |
 |---|---|---|
-| ¿Sesión en cookie o JWT? | Backend | Cookie `HttpOnly; SameSite=Strict` con token anti-CSRF |
 | ¿Roles `cliente` y `administrador`, y qué puede hacer cada uno? | Docs, con Backend | Empezar con esos dos |
-| ¿Quién implementa el hash Argon2id? | Arquitectura y Backend | Arquitectura escribe la función, Backend la usa |
-| ¿Herramienta de migraciones? | Arquitectura y Backend | Alembic |
 | ¿Está aprobado el proyecto por el docente? | Docs | Confirmarlo cuanto antes |
 
 ## 6. Dónde está cada cosa
 
 ```
-backend/app/        main.py (la API), config.py (secretos), db.py (conexión)
+backend/app/        main.py, routers/ (endpoints), security.py, deps.py, schemas.py, config.py, db.py
 backend/tests/      Pruebas del backend (pytest)
 frontend/           Frontend
 proxy/              Nginx: cabeceras, CSP, rate limiting, límites

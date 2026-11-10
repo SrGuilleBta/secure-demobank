@@ -23,8 +23,18 @@ class Settings(BaseSettings):
     db_user: str = "demobank_app"
     db_app_password: SecretStr
 
-    # Llave para firmar tokens/sesiones (la usa el módulo de autenticación).
+    # Reservada para firmar datos de la aplicación. Las sesiones no la usan: son tokens aleatorios guardados
+    # (solo su hash) en la tabla sessions.
     app_secret_key: SecretStr
+
+    # Reglas de autenticación.
+    session_ttl_minutes: int = 30  # expira por inactividad; cada petición autenticada la renueva
+    max_failed_attempts: int = 5  # intentos fallidos antes de bloquear la cuenta
+    lockout_minutes: int = 15
+    cookie_secure: bool = False  # True cuando el sitio se sirva por HTTPS
+
+    # Saldo con el que nace cada cuenta (dinero ficticio de la demo), en centavos.
+    initial_balance_cents: int = 100_000
 
     @property
     def is_development(self) -> bool:

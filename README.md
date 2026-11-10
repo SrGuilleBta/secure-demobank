@@ -62,6 +62,8 @@ La primera vez tarda unos minutos porque descarga las imágenes de Docker. Qué 
 | `python scripts/dev.py reset` | Detiene el stack y **borra la base de datos** (pide confirmación) |
 | `python scripts/dev.py logs` | Sigue los logs de todos los servicios (Ctrl+C para salir) |
 | `python scripts/dev.py setup` | Solo genera secretos y `.env`, sin levantar nada (nunca sobrescribe) |
+| `python scripts/dev.py test` | Pruebas del backend contra un PostgreSQL temporal (se crea y se borra solo) |
+| `python scripts/dev.py admin <usuario>` | Convierte en administrador a un usuario ya registrado |
 | `python scripts/dev.py scan` | Gitleaks, Semgrep, pip-audit y npm audit, igual que en el CI |
 
 ### Después de cambiar código
@@ -71,15 +73,23 @@ La primera vez tarda unos minutos porque descarga las imágenes de Docker. Qué 
 | Código del backend (`backend/`) | `python scripts/dev.py up` (reconstruye la imagen) |
 | Configuración del proxy (`proxy/`) | `docker compose restart proxy` |
 | Código del frontend (`frontend/`) | `python scripts/dev.py up` (reconstruye la imagen del proxy), o `npm run dev` en `frontend/` para verlo al instante en <http://localhost:5173> |
-| Contraseñas (`secrets/`) o scripts de `db/init/` | `python scripts/dev.py reset` y luego `up` (la base de datos solo lee esos datos al crearse) |
+| Tablas (`db/schema.sql`), contraseñas (`secrets/`) o scripts de `db/init/` | `python scripts/dev.py reset` y luego `up` (la base de datos solo lee esos datos al crearse) |
 
 ### Pruebas del backend
 
+Con el entorno virtual del backend creado (una sola vez):
+
 ```bash
-cd backend && python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt && .venv/Scripts/pytest
+cd backend && python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt
 ```
 
-(En Linux/macOS, usa `.venv/bin/` en lugar de `.venv/Scripts/`.)
+(En Linux/macOS, usa `.venv/bin/` en lugar de `.venv/Scripts/`.) Después, desde la raíz del repo:
+
+```bash
+backend/.venv/Scripts/python scripts/dev.py test
+```
+
+Levanta una base de datos desechable con Docker, corre las pruebas (incluidas las de seguridad) y la borra.
 
 ### Problemas comunes
 
@@ -98,7 +108,7 @@ cd backend && python -m venv .venv && .venv/Scripts/pip install -r requirements-
 backend/        API FastAPI (app/, tests/, Dockerfile)
 frontend/       Frontend React + Vite (se compila dentro de la imagen del proxy)
 proxy/          Nginx: cabeceras de seguridad, rate limiting, y Dockerfile que compila y sirve el frontend
-db/init/        Creación de roles de PostgreSQL con mínimo privilegio
+db/             Esquema de la base de datos (schema.sql) y creación de roles con mínimo privilegio (init/)
 scripts/dev.py  Arranque, reinicio y escaneos locales
 docs/           Arquitectura, modelo de amenazas y pipeline DevSecOps
 .github/        Workflow de seguridad

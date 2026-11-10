@@ -29,7 +29,7 @@ PR, manualmente (*workflow_dispatch*) y los lunes a las 06:00 UTC.
 | Dependencias (pip-audit) | Alguna dependencia de `backend/requirements.txt` tiene una vulnerabilidad conocida |
 | Frontend (npm audit y build) | Una dependencia de `frontend/package-lock.json` tiene una vulnerabilidad moderada o peor, o el build falla |
 | Revisión de dependencias del PR | El PR agrega una dependencia con vulnerabilidad moderada o mayor |
-| Pruebas del backend | Falla alguna prueba |
+| Pruebas del backend | Falla alguna prueba (corren contra un PostgreSQL del propio job) |
 
 Los hallazgos de Gitleaks y Semgrep se publican en formato SARIF en la pestaña **Security → Code scanning** del
 repositorio, donde quedan como evidencia con su historial (abierto, corregido, descartado).

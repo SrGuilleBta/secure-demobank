@@ -80,6 +80,7 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ./db/schema.sql:/schema.sql:ro
     tmpfs:
       - /tmp
       - /var/run/postgresql

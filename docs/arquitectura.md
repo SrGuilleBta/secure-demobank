@@ -106,7 +106,7 @@ ni crear roles. Las tablas *append-only* (bitácora de auditoría) deben además
 | **F2** | Navegador → Proxy → API | Documentación interactiva y esquema OpenAPI | HTTP en `127.0.0.1:8080` | Solo existe con `APP_ENV=development`; CSP propia en `/api/docs` |
 | **F3** | Proxy → API | Las mismas peticiones de F1 | HTTP en red interna `edge` | Red sin salida y sin otros participantes; cabeceras saneadas por el proxy |
 | **F4** | API → PostgreSQL | Consultas y resultados (saldos, movimientos, hashes) | Protocolo PostgreSQL en red interna `data` | Rol `demobank_app`, SCRAM-SHA-256, consultas parametrizadas |
-| **F5** | Migraciones → PostgreSQL | DDL | Protocolo PostgreSQL | Rol `demobank_migrator`, que no usa la API (pendiente: servicio `migrate` de un solo uso) |
+| **F5** | Migraciones → PostgreSQL | DDL | Protocolo PostgreSQL | Rol `demobank_migrator`: crea las tablas con `db/schema.sql` al iniciar la base de datos; la API no lo usa |
 | **F6** | Host → contenedores | Contraseñas y llave de firma | Montaje de archivo de solo lectura en `/run/secrets` | Generados con CSPRNG (256 bits); `secrets/` en `.gitignore`; cada servicio recibe solo los suyos |
 | **F7** | Desarrollador → GitHub → Actions | Código fuente y dependencias | HTTPS/SSH a GitHub | Pipeline de seguridad en cada push y PR |
 | **F8** | Servicios → logs | Eventos, errores, auditoría | stdout de Docker | Sin secretos ni datos sensibles en logs (`SecretStr`, `hide_parameters`) |
@@ -160,6 +160,8 @@ C = confidencialidad, I = integridad, D = disponibilidad.
 | D-13 | Dependencias, imágenes y actions fijadas por versión o SHA; escaneo continuo | Seguridad de la cadena de suministro | Builds reproducibles; ningún cambio de versión entra sin pasar por CI | T-22 |
 | D-14 | Errores genéricos al cliente y detalle solo en logs del servidor | Fallar de forma segura | El cliente nunca ve trazas, consultas ni rutas internas | T-14 |
 | D-15 | FastAPI + PostgreSQL | Usar controles maduros | Pydantic valida tipos y rangos por defecto; PostgreSQL ofrece transacciones ACID, `CHECK`, bloqueos de fila y roles | T-06, T-07, T-08 |
+| D-16 | Sesiones guardadas en el servidor (token aleatorio, solo su hash en la BD) con cookie `HttpOnly; SameSite=Strict` y token CSRF en cabecera | Mínimo privilegio y defensa en profundidad | Se pueden revocar en el servidor, el token no se puede leer desde JavaScript y otro sitio no puede usar la cookie; un JWT no se puede anular antes de expirar | T-02, T-09 |
+| D-17 | Esquema de la base de datos en un script SQL (`db/schema.sql`) cargado por el rol `demobank_migrator`, sin herramienta de migraciones | Simplicidad | Pocas tablas y un solo entorno: un SQL revisable basta, y el rol que crea las tablas no es el que usa la API | T-06, T-11 |
 
 ## 9. Verificación de los controles de infraestructura
 
@@ -190,8 +192,8 @@ automatizadas (ZAP, casos de prueba de seguridad) se suman en las semanas 4 y 5.
 - Los secretos se leen con `get_settings()` (`backend/app/config.py`). Si necesitas uno nuevo: agrégalo en
   `PASSWORD_SECRETS`/`KEY_SECRETS` de `scripts/dev.py`, en `secrets:` de `docker-compose.yml` y como `SecretStr`
   en `Settings`.
-- Las migraciones (Alembic) corren con `demobank_migrator`, nunca con el usuario de la API. Propuesta: un servicio
-  `migrate` de un solo uso en Compose del que dependa `backend`.
+- Los cambios al esquema se hacen en `db/schema.sql` (lo carga `demobank_migrator`, nunca el usuario de la API) y se
+  aplican con `python scripts/dev.py reset` y `up`.
 - Dinero en **enteros (centavos)** o `Decimal`, nunca `float`. `CHECK (saldo >= 0)` en la tabla.
 - Transferencias en **una transacción** con `SELECT ... FOR UPDATE` sobre ambas cuentas (en orden fijo para evitar
   *deadlocks*) y una llave de idempotencia (T-08).

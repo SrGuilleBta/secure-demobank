@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
 import app.main as main
+from app import db
 
 
 @pytest.fixture
@@ -11,7 +12,7 @@ def client():
 
 
 def test_health_ok(client, monkeypatch):
-    monkeypatch.setattr(main, "get_engine", lambda: create_engine("sqlite://"))
+    monkeypatch.setattr(db, "get_engine", lambda: create_engine("sqlite://"))
     response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -19,7 +20,7 @@ def test_health_ok(client, monkeypatch):
 
 def test_health_db_down_does_not_leak_details(client, monkeypatch):
     broken = create_engine("sqlite:///no/such/dir/demobank.db")
-    monkeypatch.setattr(main, "get_engine", lambda: broken)
+    monkeypatch.setattr(db, "get_engine", lambda: broken)
     response = client.get("/api/health")
     assert response.status_code == 503
     assert response.json() == {"status": "unavailable"}

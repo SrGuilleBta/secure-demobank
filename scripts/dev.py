@@ -6,6 +6,8 @@
     python scripts/dev.py down    Detiene el stack (conserva los datos)
     python scripts/dev.py reset   Detiene el stack y BORRA la base de datos (pide confirmación)
     python scripts/dev.py logs    Sigue los logs de todos los servicios
+    python scripts/dev.py test    Pruebas del backend contra un PostgreSQL temporal (requiere pytest instalado)
+    python scripts/dev.py admin <usuario>   Convierte a un usuario ya registrado en administrador
     python scripts/dev.py scan    Escaneos locales: Gitleaks, Semgrep, pip-audit y npm audit (los mismos que corre el CI)
 
 Solo usa la biblioteca estándar de Python; requiere Docker.
@@ -13,6 +15,7 @@ Solo usa la biblioteca estándar de Python; requiere Docker.
 
 import argparse
 import os
+import re
 import secrets
 import shutil
 import subprocess
@@ -31,6 +34,9 @@ GITLEAKS_IMAGE = "zricethezav/gitleaks:v8.30.1"
 SEMGREP_IMAGE = "semgrep/semgrep:1.180.0"
 PYTHON_IMAGE = "python:3.12-slim-trixie"
 NODE_IMAGE = "node:24-alpine"
+POSTGRES_IMAGE = "postgres:17-alpine"
+TEST_DB_CONTAINER = "demobank-test-db"
+TEST_DB_PORT = "55432"
 PIP_AUDIT_VERSION = "2.10.1"
 SEMGREP_CONFIGS = [
     "p/python", "p/javascript", "p/react", "p/owasp-top-ten", "p/dockerfile", "p/docker-compose", "p/nginx",
@@ -115,6 +121,55 @@ def cmd_logs(_args: argparse.Namespace) -> None:
     run(["docker", "compose", "logs", "-f", "--tail", "100"], check=False)
 
 
+def cmd_admin(args: argparse.Namespace) -> None:
+    username = args.username.strip().lower()
+    if not re.fullmatch(r"[a-z0-9_]{3,32}", username):
+        sys.exit("Nombre de usuario inválido (3 a 32 caracteres: letras, números y guion bajo).")
+    # El nombre viaja como variable de psql (:'u'), no pegado al SQL.
+    result = subprocess.run(
+        ["docker", "compose", "exec", "-T", "db", "psql", "-U", "postgres", "-d", "demobank",
+         "-v", "ON_ERROR_STOP=1", "-v", f"u={username}", "-At"],
+        cwd=ROOT, input="UPDATE app.users SET role = 'administrador' WHERE username = :'u';",
+        text=True, capture_output=True,
+    )
+    if result.returncode != 0:
+        sys.exit(result.stderr.strip() or "No se pudo conectar a la base de datos. ¿Está levantado el stack?")
+    if "UPDATE 1" not in result.stdout:
+        sys.exit(f"No existe el usuario '{username}'. Regístralo primero desde la aplicación.")
+    print(f"{username} ahora es administrador.")
+
+
+def cmd_test(_args: argparse.Namespace) -> None:
+    """Corre pytest contra un PostgreSQL desechable que se crea y se borra solo."""
+    run(["docker", "rm", "-f", TEST_DB_CONTAINER], check=False)
+    run(["docker", "run", "-d", "--rm", "--name", TEST_DB_CONTAINER, "-e", "POSTGRES_PASSWORD=test",
+         "-p", f"127.0.0.1:{TEST_DB_PORT}:5432", POSTGRES_IMAGE])
+    try:
+        # -h 127.0.0.1 (TCP): durante el arranque inicial la imagen solo escucha por socket local.
+        for _ in range(30):
+            ready = subprocess.run(
+                ["docker", "exec", TEST_DB_CONTAINER, "pg_isready", "-h", "127.0.0.1", "-U", "postgres"],
+                capture_output=True,
+            )
+            if ready.returncode == 0:
+                break
+            time.sleep(2)
+        else:
+            sys.exit("La base de datos de pruebas no arrancó.")
+        # Se envía como bytes UTF-8: en Windows el texto saldría con la codificación local y PostgreSQL lo rechazaría.
+        schema = (ROOT / "db" / "schema.sql").read_bytes()
+        subprocess.run(
+            ["docker", "exec", "-i", TEST_DB_CONTAINER, "psql", "-U", "postgres", "-q", "-v", "ON_ERROR_STOP=1"],
+            input=schema, check=True,
+        )
+        env = {**os.environ,
+               "TEST_DATABASE_URL": f"postgresql+psycopg://postgres:test@127.0.0.1:{TEST_DB_PORT}/postgres"}
+        code = subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=ROOT / "backend", env=env).returncode
+    finally:
+        run(["docker", "rm", "-f", TEST_DB_CONTAINER], check=False)
+    sys.exit(code)
+
+
 def cmd_scan(_args: argparse.Namespace) -> None:
     REPORTS_DIR.mkdir(exist_ok=True)
     failures = []
@@ -182,6 +237,10 @@ def main() -> None:
     reset.add_argument("--yes", action="store_true", help="no pedir confirmación")
     reset.set_defaults(func=cmd_reset)
     sub.add_parser("logs").set_defaults(func=cmd_logs)
+    sub.add_parser("test").set_defaults(func=cmd_test)
+    admin = sub.add_parser("admin")
+    admin.add_argument("username")
+    admin.set_defaults(func=cmd_admin)
     sub.add_parser("scan").set_defaults(func=cmd_scan)
     args = parser.parse_args()
     try:

@@ -120,6 +120,21 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    env:
+      # Base de datos desechable del propio job (credenciales de prueba, sin relación con el stack real).
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:test@localhost:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -130,4 +145,6 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements*.txt
       - run: pip install -r requirements-dev.txt
+      - name: Crear las tablas en la base de pruebas
+        run: PGPASSWORD=test psql -h localhost -U postgres -v ON_ERROR_STOP=1 -q -f ../db/schema.sql
       - run: pytest -q
