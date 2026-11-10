@@ -213,14 +213,7 @@ requisitos de seguridad, modelo de amenazas, principales amenazas, mitigaciones,
 demostración, herramientas de verificación, vulnerabilidades encontradas, correcciones, evidencia de las pruebas
 finales y conclusiones.
 
-## 5. Decisiones abiertas
-
-| Decisión | Quién | Mi recomendación |
-|---|---|---|
-| ¿Roles `cliente` y `administrador`, y qué puede hacer cada uno? | Docs, con Backend | Empezar con esos dos |
-| ¿Está aprobado el proyecto por el docente? | Docs | Confirmarlo cuanto antes |
-
-## 6. Dónde está cada cosa
+## 5. Dónde está cada cosa
 
 ```
 backend/app/        main.py, routers/ (endpoints), security.py, deps.py, schemas.py, config.py, db.py
