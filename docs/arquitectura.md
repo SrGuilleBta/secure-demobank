@@ -163,27 +163,43 @@ C = confidencialidad, I = integridad, D = disponibilidad.
 | D-16 | Sesiones guardadas en el servidor (token aleatorio, solo su hash en la BD) con cookie `HttpOnly; SameSite=Strict` y token CSRF en cabecera | Mínimo privilegio y defensa en profundidad | Se pueden revocar en el servidor, el token no se puede leer desde JavaScript y otro sitio no puede usar la cookie; un JWT no se puede anular antes de expirar | T-02, T-09 |
 | D-17 | Esquema de la base de datos en un script SQL (`db/schema.sql`) cargado por el rol `demobank_migrator`, sin herramienta de migraciones | Simplicidad | Pocas tablas y un solo entorno: un SQL revisable basta, y el rol que crea las tablas no es el que usa la API | T-06, T-11 |
 
-## 9. Verificación de los controles de infraestructura
+## 9. Verificación de los controles
 
-Pruebas manuales realizadas el 2026-10-31 sobre el stack levantado con `python scripts/dev.py up`. Las pruebas
-automatizadas (ZAP, casos de prueba de seguridad) se suman en las semanas 4 y 5.
+Pruebas manuales sobre el stack levantado con `python scripts/dev.py up`: infraestructura el 2026-10-31 y backend el
+2026-11-09. Los controles del backend además tienen pruebas automáticas (`python scripts/dev.py test`, en
+`backend/tests/`). El escaneo dinámico con ZAP y los casos de prueba finales se suman en las semanas 4 y 5.
 
 | Control | Prueba | Esperado | Obtenido |
 |---|---|---|---|
 | Puerto solo en loopback | `docker compose ps` | Proxy publicado en `127.0.0.1:8080`; sin puertos en `backend` ni `db` | Proxy en `127.0.0.1:8080`; `backend` y `db` sin puertos publicados; el puerto 8080 solo escucha en `127.0.0.1` |
 | Host ajeno rechazado | `curl -H "Host: evil.example" http://localhost:8080/api/health` | `421` | `421` |
 | Cabeceras de seguridad | `curl -D - http://localhost:8080/` | CSP, `nosniff`, `DENY`, `no-referrer`, COOP, CORP, Permissions-Policy | Todas presentes |
-| API sin caché | `curl -D - http://localhost:8080/api/health` | `Cache-Control: no-store` y CSP `default-src 'none'` | |
+| API sin caché | `curl -D - http://localhost:8080/api/health` | `Cache-Control: no-store` y CSP `default-src 'none'` | Ambos presentes |
 | Límite de cuerpo | `POST` de 70 KB a `/api/health` | `413` | `413` |
 | Rate limiting en auth | 9 peticiones seguidas a `/api/auth/login` | `429` a partir de la 7ª (1 + ráfaga de 5) | 6 × `404`, luego 3 × `429` |
 | BD no publicada | `docker compose ps` | Sin puerto publicado en `db` | (el 5432 del host es un PostgreSQL nativo de Windows, ajeno al proyecto) |
 | Mínimo privilegio en BD | `CREATE TABLE` y `DROP TABLE` como `demobank_app` | Rechazados | `permission denied for schema app` / `must be owner of table` |
-| DML de la API | `INSERT` y `SELECT` como `demobank_app` sobre una tabla del migrator | Permitido | |
+| DML de la API | `INSERT` y `SELECT` como `demobank_app` sobre una tabla del migrator | Permitido | Permitido |
 | Contenedores sin root | `id -u` en cada servicio | Distinto de 0 | proxy 101, backend 10001, db 70 |
 | FS solo lectura | `touch /probe` en cada servicio | Error | `Read-only file system` en los tres |
 | API sin salida a internet | `urlopen('https://pypi.org')` desde el backend | Falla | `Temporary failure in name resolution` |
 | Proxy aislado de la BD | `nc -z db 5432` desde el proxy | Falla | `bad address 'db'` |
 | Secretos fuera del entorno | `env \| grep -ci password` en el backend | `0` | `0` |
+| Contraseñas con Argon2id (T-01) | `SELECT left(password_hash, 30) FROM app.users` | Empieza con `$argon2id$` | `$argon2id$v=19$m=65536,t=3,p=4` |
+| Cookie de sesión protegida (T-02) | Login en el navegador y `document.cookie` | Vacío (la cookie es `HttpOnly`); `SameSite=Strict` | Vacío; atributos presentes |
+| Sesión se invalida en el servidor (T-02) | Reusar la cookie después de `POST /api/auth/logout` | `401` | `401` (navegador y pruebas) |
+| Bloqueo de cuenta (T-03) | 5 logins fallidos y uno con la clave correcta | `401` en todos | `401` en todos (pruebas) |
+| Mensaje igual al fallar el login (T-17) | Usuario inexistente vs. clave incorrecta | Misma respuesta | Misma respuesta (pruebas) |
+| CSRF (T-09) | `POST /api/transfers` sin `X-CSRF-Token` | `403` | `403` (navegador y pruebas) |
+| Validación de montos y campos (T-07) | Montos `-500`, `0`, `10.5`, `"100"`, `10^12` y campos extra (`role`, origen) | `422` | `422` en todos (pruebas) |
+| Sin eco de datos en errores (T-14) | Registro con contraseña corta; error interno forzado | La respuesta no contiene la contraseña; `500` genérico | Confirmado (pruebas) |
+| Doble gasto (T-08) | 10 transferencias simultáneas de 30.000 con saldo de 100.000 | Solo 3 aprobadas; el dinero total se conserva | 3 aprobadas, 7 rechazadas; total conservado (pruebas) |
+| Idempotencia (T-08) | La misma transferencia dos veces | `201` y luego `200`; un solo cobro | `201` y `200`; saldo descontado una vez (navegador y pruebas) |
+| IDOR (T-13) | Un tercer usuario pide una transferencia ajena | `404` | `404` (pruebas y flujo de punta a punta) |
+| Autorización por rol (T-20) | Un cliente llama a `/api/admin/*` | `403` | `403` (pruebas y flujo de punta a punta) |
+| Bitácora de solo inserción (T-11) | `UPDATE` y `DELETE` sobre `audit_log` como `demobank_app` | Rechazados | `permission denied for table audit_log` |
+| Saldo negativo imposible (T-07) | `UPDATE accounts SET balance_cents = -1` como `demobank_app` | Rechazado | `violates check constraint "accounts_balance_cents_check"` |
+| IP real en la bitácora (T-12) | Login con `X-Forwarded-For: 1.2.3.4` y consultar `/api/admin/audit` | Se registra la IP real | `172.20.0.1` (la IP real vista por el proxy) |
 
 ## 10. Lineamientos para el resto del equipo
 

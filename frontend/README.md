@@ -39,6 +39,22 @@ Reconstruye la imagen del proxy con tu código y deja la aplicación en <http://
   debe ir en archivos propios (Vite ya lo hace así). Si una librería lo requiere, se documenta y se ajusta la CSP.
 - Nunca usar `dangerouslySetInnerHTML` ni insertar HTML crudo (T-10). No guardar tokens en `localStorage`.
 
+## Hablar con la API
+
+La tabla completa de endpoints está en [docs/guia-equipo.md](../docs/guia-equipo.md) (sección 4.2). Para probarlos a mano:
+<http://localhost:8080/api/docs>. Lo que hay que respetar desde React:
+
+- **Sesión:** el navegador guarda la cookie solo (es `HttpOnly`); no hace falta tocarla. Todas las peticiones van al mismo
+  origen (`fetch('/api/...')`).
+- **Token CSRF:** `POST /api/auth/login` devuelve `csrf_token`. Guárdalo **en memoria** (estado de React, no
+  `localStorage`) y mándalo en la cabecera `X-CSRF-Token` en cada `POST` (transferir y cerrar sesión). Sin él responde `403`.
+- **Transferencias:** `amount_cents` es un **entero en centavos** (2500 = 25,00). Cada transferencia nueva lleva un
+  `idempotency_key` nuevo (`crypto.randomUUID()`); si se reintenta la misma petición, se reutiliza la misma llave.
+- **Errores:** `401` = sin sesión (llevar al login), `403` = sin permiso o token CSRF faltante, `409` = saldo
+  insuficiente, `422` = datos inválidos (`detail` trae `campo` y `mensaje`). Mostrar mensajes propios, no el texto crudo.
+- **Administrador:** el rol llega en la respuesta del login (`role`); la pantalla de administrador solo se muestra si es
+  `administrador`, pero **la seguridad la aplica el backend**, no el frontend.
+
 ## Dependencias
 
 Las versiones están fijadas en `package.json` (sin `^`) y `package-lock.json` se sube al repo. Para agregar una librería:
