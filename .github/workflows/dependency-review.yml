@@ -1,0 +1,27 @@
+# Revisión de dependencias del PR. Vive en su propio workflow porque solo tiene sentido en pull_request
+# (compara la base contra el head); dentro de security.yml aparecía como "Skipped" en cada push a main.
+# Las actions están fijadas por SHA de commit (no por tag) para evitar ataques a la cadena de suministro.
+
+name: dependency-review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  revision-dependencias:
+    name: Revisión de dependencias del PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
